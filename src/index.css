@@ -1,0 +1,141 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #f4f7f5;
+    --foreground: #0f1c14;
+    --card: #ffffff;
+    --card-foreground: #0f1c14;
+    --popover: #ffffff;
+    --popover-foreground: #0f1c14;
+    --primary: #0f766e; /* Deep Forest Emerald */
+    --primary-foreground: #ffffff;
+    --secondary: #e6eeeb; /* Muted Sage Green */
+    --secondary-foreground: #0f1c14;
+    --muted: #e6eeeb;
+    --muted-foreground: #5c6e65;
+    --accent: #ea580c; /* Fire Orange */
+    --accent-foreground: #ffffff;
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+    --border: #cbdad5;
+    --input: #cbdad5;
+    --ring: #f97316;
+    --radius: 1rem;
+  }
+
+  .dark {
+    --background: #040705;
+    --foreground: #ecf3ef;
+    --card: #0a0f0c;
+    --card-foreground: #ecf3ef;
+    --popover: #0a0f0c;
+    --popover-foreground: #ecf3ef;
+    --primary: #10b981; /* Glowing Neon Green */
+    --primary-foreground: #040705;
+    --secondary: #121f18; /* Dense Moss Green */
+    --secondary-foreground: #ecf3ef;
+    --muted: #121f18;
+    --muted-foreground: #708a7d;
+    --accent: #f97316; /* Glowing Fire Orange */
+    --accent-foreground: #ffffff;
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+    --border: #16261d;
+    --input: #16261d;
+    --ring: #f97316;
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+    transition: background-color 0.3s ease, color 0.3s ease;
+    
+    /* Elegant dotted technical pattern for lab visualizer look */
+    background-image: radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0);
+    background-size: 24px 24px;
+  }
+
+  .dark body {
+    background-image: radial-gradient(circle at 1px 1px, rgba(16, 185, 129, 0.03) 1.5px, transparent 0);
+  }
+}
+
+/* Custom premium styling classes */
+.dark .bg-card {
+  background-color: rgba(10, 15, 12, 0.8);
+  backdrop-filter: blur(16px);
+  border-color: rgba(16, 185, 129, 0.05);
+}
+
+.glow-btn-primary:hover {
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.25);
+}
+
+.glow-btn-accent:hover {
+  box-shadow: 0 0 15px rgba(249, 115, 22, 0.3);
+}
+
+/* High-tech canvas container border decoration */
+.canvas-frame {
+  position: relative;
+}
+
+.canvas-frame::before {
+  content: '';
+  position: absolute;
+  top: -2px; left: -2px; right: -2px; bottom: -2px;
+  background: linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(249,115,22,0.2) 100%);
+  z-index: -1;
+  border-radius: calc(var(--radius) + 2px);
+}
+
+/* Custom range slider thumb rendering overrides */
+input[type="range"]::-webkit-slider-runnable-track {
+  background: var(--secondary);
+  border-radius: 9999px;
+  height: 6px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  background: var(--primary);
+  border: 2px solid var(--card);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.25);
+  margin-top: -5px;
+}
+
+.dark input[type="range"]::-webkit-slider-thumb {
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.45);
+}
+
+/* Canvas rendering classes */
+.canvas-container {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background-color: var(--secondary);
+}
+
+.canvas-grab {
+  cursor: grab;
+}
+
+.canvas-grabbing {
+  cursor: grabbing;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
