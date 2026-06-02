@@ -5,6 +5,7 @@ import { SimulationSettings } from "./components/SimulationSettings";
 import { SimulationTab } from "./components/SimulationTab";
 import { MonteCarloSection } from "./components/MonteCarloSection";
 import { TheoryAccordion } from "./components/TheoryAccordion";
+import { Footer } from "./components/Footer";
 import { Tv, BarChart2, BookOpen } from "lucide-react";
 
 function App() {
@@ -20,9 +21,10 @@ function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+        <h1 className="sr-only">Interaktiver Waldbrand- und Perkolationstheorie-Simulator</h1>
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Settings Sidebar */}
-          <div className="lg:col-span-4 flex flex-col gap-6">
+          <aside className="lg:col-span-4 flex flex-col gap-6">
             <SimulationSettings
               settings={sim.settings}
               setRows={sim.setRows}
@@ -37,13 +39,15 @@ function App() {
               onResume={sim.handleResume}
               onReset={sim.resetGridToInitial}
               getSpeedLabel={sim.getSpeedLabel}
+              showClusters={sim.showClusters}
+              setShowClusters={sim.setShowClusters}
             />
-          </div>
+          </aside>
 
           {/* Main Display Area (Tabs + Canvas/Charts/Theory) */}
           <div className="lg:col-span-8 flex flex-col gap-6">
             {/* Navigation Tabs */}
-            <div className="flex border-b border-border overflow-x-auto whitespace-nowrap scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0">
+            <nav aria-label="Hauptnavigation" className="flex border-b border-border overflow-x-auto whitespace-nowrap scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0">
               <button
                 onClick={() => setActiveTab("simulation")}
                 className={`pb-3 px-4 border-b-2 font-outfit text-sm font-semibold transition-all flex items-center gap-2 shrink-0 ${
@@ -77,7 +81,7 @@ function App() {
                 <BookOpen className="w-4 h-4" />
                 Perkolationstheorie
               </button>
-            </div>
+            </nav>
 
             {/* Tab Panels */}
             <div className="flex flex-col gap-6">
@@ -91,6 +95,12 @@ function App() {
                   stats={sim.stats}
                   runtime={sim.runtime}
                   percolationResult={sim.percolationResult}
+                  showClusters={sim.showClusters}
+                  clusterGrid={sim.clusterGrid}
+                  highlightedClusterId={sim.highlightedClusterId}
+                  isClusterSpanning={sim.isClusterSpanning}
+                  currentStepIndex={sim.currentStepIndex}
+                  jumpToStep={sim.jumpToStep}
                 />
               )}
 
@@ -112,7 +122,7 @@ function App() {
       </main>
 
       {/* Footer */}
-      {/* <Footer /> */}
+      <Footer />
     </div>
   );
 }

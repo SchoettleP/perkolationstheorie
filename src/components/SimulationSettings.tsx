@@ -25,6 +25,8 @@ interface SimulationSettingsProps {
   onResume: () => void;
   onReset: () => void;
   getSpeedLabel: (level: number) => string;
+  showClusters: boolean;
+  setShowClusters: (val: boolean) => void;
 }
 
 export function SimulationSettings({
@@ -40,12 +42,14 @@ export function SimulationSettings({
   onPause,
   onResume,
   onReset,
-  getSpeedLabel
+  getSpeedLabel,
+  showClusters,
+  setShowClusters
 }: SimulationSettingsProps) {
   const { rows, cols, probability, useDiagonal, speedLevel } = settings;
 
-  const intervalRef = useRef<any>(null);
-  const timeoutRef = useRef<any>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const startChanging = (direction: "increase" | "decrease") => {
     if (simState === "running" || simState === "paused") return;
@@ -225,6 +229,20 @@ export function SimulationSettings({
             <div className="flex flex-col">
               <span className="text-xs font-bold text-foreground">Diagonale Nachbarn</span>
               <span className="text-[10px] text-muted-foreground">8er-Nachbarschaft aktivieren</span>
+            </div>
+          </label>
+
+          {/* Cluster Checkbox */}
+          <label className="flex items-center gap-2.5 cursor-pointer select-none py-1 group">
+            <input
+              type="checkbox"
+              checked={showClusters}
+              onChange={(e) => setShowClusters(e.target.checked)}
+              className="w-4.5 h-4.5 rounded border-border text-primary bg-background focus:ring-primary cursor-pointer"
+            />
+            <div className="flex flex-col">
+              <span className="text-xs font-bold text-foreground">Baum-Cluster hervorheben</span>
+              <span className="text-[10px] text-muted-foreground">Größten Cluster leuchtend einfärben</span>
             </div>
           </label>
 

@@ -169,4 +169,143 @@ export class PercolationEngine {
       burntPercentageOfTotalGrid: (burnt / this.grid.length) * 100
     };
   }
+
+  /**
+   * Identifies all connected tree clusters in the grid and highlights the spanning (or largest) cluster.
+   */
+  public getClusters(): {
+    clusterIds: Int32Array;
+    highlightedClusterId: number;
+    isSpanning: boolean;
+  } {
+    const size = this.width * this.height;
+    const clusterIds = new Int32Array(size);
+    clusterIds.fill(-1);
+    
+    let nextClusterId = 0;
+    const clusterSizes = new Map<number, number>();
+    
+    // To avoid recursion limit, we use BFS with a queue.
+    const queue = new Int32Array(size);
+    
+    for (let i = 0; i < size; i++) {
+      if (this.grid[i] === CellState.EMPTY || clusterIds[i] !== -1) {
+        continue;
+      }
+      
+      const clusterId = nextClusterId++;
+      let queueStart = 0;
+      let queueEnd = 0;
+      
+      queue[queueEnd++] = i;
+      clusterIds[i] = clusterId;
+      
+      while (queueStart < queueEnd) {
+        const idx = queue[queueStart++];
+        
+        const r = Math.floor(idx / this.width);
+        const c = idx % this.width;
+        
+        const neighbors = [
+          [r - 1, c],
+          [r + 1, c],
+          [r, c - 1],
+          [r, c + 1]
+        ];
+        
+        if (this.useDiagonal) {
+          neighbors.push(
+            [r - 1, c - 1],
+            [r - 1, c + 1],
+            [r + 1, c - 1],
+            [r + 1, c + 1]
+          );
+        }
+        
+        for (let j = 0; j < neighbors.length; j++) {
+          const [nr, nc] = neighbors[j];
+          if (nr >= 0 && nr < this.height && nc >= 0 && nc < this.width) {
+            const nIdx = nr * this.width + nc;
+            if (this.grid[nIdx] !== CellState.EMPTY && clusterIds[nIdx] === -1) {
+              clusterIds[nIdx] = clusterId;
+              queue[queueEnd++] = nIdx;
+            }
+          }
+        }
+      }
+      
+      clusterSizes.set(clusterId, queueEnd);
+    }
+    
+    // Identify touchesLeft and touchesRight for all clusters
+    const touchesLeft = new Set<number>();
+    const touchesRight = new Set<number>();
+    
+    for (let r = 0; r < this.height; r++) {
+      const leftIdx = r * this.width;
+      const leftCluster = clusterIds[leftIdx];
+      if (leftCluster !== -1) {
+        touchesLeft.add(leftCluster);
+      }
+      
+      const rightIdx = r * this.width + (this.width - 1);
+      const rightCluster = clusterIds[rightIdx];
+      if (rightCluster !== -1) {
+        touchesRight.add(rightCluster);
+      }
+    }
+    
+    // Find if there is a spanning cluster
+    const spanningClusters: number[] = [];
+    touchesLeft.forEach(id => {
+      if (touchesRight.has(id)) {
+        spanningClusters.push(id);
+      }
+    });
+    
+    let highlightedClusterId = -1;
+    let isSpanning = false;
+    
+    if (spanningClusters.length > 0) {
+      isSpanning = true;
+      let maxSpanningSize = 0;
+      for (const id of spanningClusters) {
+        const size = clusterSizes.get(id) || 0;
+        if (size > maxSpanningSize) {
+          maxSpanningSize = size;
+          highlightedClusterId = id;
+        }
+      }
+    } else {
+      let maxClusterSize = 0;
+      clusterSizes.forEach((size, id) => {
+        if (size > maxClusterSize) {
+          maxClusterSize = size;
+          highlightedClusterId = id;
+        }
+      });
+    }
+    
+    return {
+      clusterIds,
+      highlightedClusterId,
+      isSpanning
+    };
+  }
+
+  /**
+   * Restores the engine to a given grid state and step count.
+   * Rebuilds the list of currently burning indices.
+   */
+  public restoreState(gridState: Uint8Array, steps: number) {
+    this.grid.set(gridState);
+    this.stepCount = steps;
+    this.burningIndices = [];
+    
+    for (let i = 0; i < this.grid.length; i++) {
+      if (this.grid[i] === CellState.BURNING) {
+        this.burningIndices.push(i);
+      }
+    }
+  }
 }

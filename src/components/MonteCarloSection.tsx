@@ -210,11 +210,12 @@ export const MonteCarloSection: React.FC<MonteCarloSectionProps> = ({
       setCurveData(calculatedCurve);
       setSummary(histogramSummary);
       setStatusText("Analyse erfolgreich abgeschlossen!");
-    } catch (e: any) {
-      if (e.message === "Cancelled") {
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      if (errorMessage === "Cancelled") {
         setStatusText("Analyse abgebrochen.");
       } else {
-        setStatusText(`Fehler bei der Analyse: ${e.message}`);
+        setStatusText(`Fehler bei der Analyse: ${errorMessage}`);
       }
     } finally {
       setIsRunning(false);
@@ -392,7 +393,7 @@ export const MonteCarloSection: React.FC<MonteCarloSectionProps> = ({
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
                   data={curveData}
-                  margin={{ top: 15, right: 20, left: 20, bottom: 25 }}
+                  margin={{ top: 15, right: 20, left: 20, bottom: 50 }}
                 >
                   <CartesianGrid
                     strokeDasharray="3 3"
@@ -400,7 +401,10 @@ export const MonteCarloSection: React.FC<MonteCarloSectionProps> = ({
                     opacity={0.6}
                   />
                   <XAxis
+                    type="number"
                     dataKey="density"
+                    domain={[40, 80]}
+                    allowDecimals={false}
                     label={{
                       value: "Baumdichte (%)",
                       position: "insideBottom",
@@ -432,7 +436,9 @@ export const MonteCarloSection: React.FC<MonteCarloSectionProps> = ({
                     }}
                   />
                   <Legend
-                    wrapperStyle={{ fontSize: "11px", marginTop: "10px" }}
+                    verticalAlign="top"
+                    height={36}
+                    wrapperStyle={{ fontSize: "11px" }}
                   />
                   <Line
                     type="monotone"
@@ -443,14 +449,14 @@ export const MonteCarloSection: React.FC<MonteCarloSectionProps> = ({
                     dot={{ r: 3 }}
                     activeDot={{ r: 5 }}
                   />
-                  {/* Reference line for the 59.27% percolation threshold */}
+                  {/* Reference line for the percolation threshold */}
                   <ReferenceLine
-                    x={59}
+                    x={useDiagonal ? 40.72 : 59.27}
                     stroke="#ef4444"
                     strokeDasharray="4 4"
                     strokeWidth={1.5}
                     label={{
-                      value: "Kritische Schwelle (~59.3%)",
+                      value: useDiagonal ? "Kritische Schwelle (~40.7%)" : "Kritische Schwelle (~59.3%)",
                       fill: "#ef4444",
                       fontSize: 10,
                       position: "insideTopLeft",
@@ -462,7 +468,7 @@ export const MonteCarloSection: React.FC<MonteCarloSectionProps> = ({
             </div>
             <p className="text-[11px] text-muted-foreground mt-3 text-center">
               Die rote gestrichelte Linie markiert die theoretische
-              Perkolationsschwelle bei ca. 59,3%. Rechts davon steigt die Kurve
+              Perkolationsschwelle bei ca. {useDiagonal ? "40,7%" : "59,3%"}. Rechts davon steigt die Kurve
               steil an (Phase Transition).
             </p>
           </div>
@@ -478,7 +484,7 @@ export const MonteCarloSection: React.FC<MonteCarloSectionProps> = ({
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={histogramData}
-                    margin={{ top: 15, right: 20, left: 20, bottom: 25 }}
+                    margin={{ top: 15, right: 20, left: 20, bottom: 45 }}
                   >
                     <CartesianGrid
                       strokeDasharray="3 3"
@@ -490,7 +496,7 @@ export const MonteCarloSection: React.FC<MonteCarloSectionProps> = ({
                       label={{
                         value: "Verbrannte Fläche (%)",
                         position: "insideBottom",
-                        offset: -15,
+                        offset: -10,
                         style: { fill: "var(--muted-foreground)", fontSize: 11 }
                       }}
                       tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}

@@ -7,6 +7,34 @@ interface SimulationCanvasProps {
   width: number;
   height: number;
   stepCount: number;
+  showClusters?: boolean;
+  clusterGrid?: Int32Array | null;
+  highlightedClusterId?: number;
+}
+
+// Helper to convert HSL to RGB
+function hslToRgb(h: number, s: number, l: number): [number, number, number, number] {
+  let r, g, b;
+
+  if (s === 0) {
+    r = g = b = l; // achromatic
+  } else {
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    const hue2rgb = (t: number) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+    r = hue2rgb(h + 1/3);
+    g = hue2rgb(h);
+    b = hue2rgb(h - 1/3);
+  }
+
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255), 255];
 }
 
 // Colors in RGBA
@@ -21,9 +49,13 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   width,
   height,
   stepCount,
+  showClusters = false,
+  clusterGrid = null,
+  highlightedClusterId = -1,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const offscreenRef = useRef<HTMLCanvasElement | null>(null);
   
   const [scale, setScale] = useState<number>(1);
   const [offsetX, setOffsetX] = useState<number>(0);
@@ -92,8 +124,11 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     ctx.fillStyle = document.documentElement.classList.contains("dark") ? "#040705" : "#f4f7f5";
     ctx.fillRect(0, 0, canvasSize.w, canvasSize.h);
     
-    // Render grid using Offscreen Canvas for maximum speed
-    const offscreen = document.createElement("canvas");
+    // Render grid using Offscreen Canvas for maximum speed (cached via Ref)
+    if (!offscreenRef.current) {
+      offscreenRef.current = document.createElement("canvas");
+    }
+    const offscreen = offscreenRef.current;
     offscreen.width = width;
     offscreen.height = height;
     const oCtx = offscreen.getContext("2d");
@@ -112,7 +147,21 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
           [r, g, b, a] = emptyColor;
           break;
         case CellState.TREE:
-          [r, g, b, a] = COLOR_TREE;
+          if (showClusters && clusterGrid && clusterGrid[i] !== -1) {
+            const cid = clusterGrid[i];
+            if (cid === highlightedClusterId) {
+              // Vibrant neon emerald for highlighted cluster
+              [r, g, b, a] = isDark ? [16, 255, 140, 255] : [5, 150, 105, 255];
+            } else {
+              // Muted multi-colored HSL based on cluster ID
+              const hue = 120 + ((cid * 43) % 80); // green to cyan-teal
+              const sat = 35 + ((cid * 17) % 25);  // 35% to 60%
+              const light = isDark ? 15 + ((cid * 7) % 15) : 60 + ((cid * 7) % 15);
+              [r, g, b, a] = hslToRgb(hue / 360, sat / 100, light / 100);
+            }
+          } else {
+            [r, g, b, a] = COLOR_TREE;
+          }
           break;
         case CellState.BURNING:
           [r, g, b, a] = COLOR_BURNING;
@@ -133,9 +182,6 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     
     // Render the offscreen canvas onto the main canvas with scaling
     ctx.imageSmoothingEnabled = false;
-    // For older browsers
-    (ctx as any).mozImageSmoothingEnabled = false;
-    (ctx as any).webkitImageSmoothingEnabled = false;
     
     const renderW = width * baseCellSize * scale;
     const renderH = height * baseCellSize * scale;
@@ -146,7 +192,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     ctx.strokeStyle = isDark ? "#16261d" : "#cbdad5";
     ctx.lineWidth = 1.5;
     ctx.strokeRect(offsetX, offsetY, renderW, renderH);
-  }, [grid, width, height, scale, offsetX, offsetY, canvasSize, stepCount]);
+  }, [grid, width, height, scale, offsetX, offsetY, canvasSize, stepCount, showClusters, clusterGrid, highlightedClusterId]);
 
   // Zoom Handler
   const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {

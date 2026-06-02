@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { PercolationEngine, SimulationStats } from "../simulation/PercolationEngine";
 
 export interface PercolationSettings {
@@ -16,6 +16,12 @@ export function usePercolation() {
   const [useDiagonal, setUseDiagonal] = useState<boolean>(false);
   const [speedLevel, setSpeedLevel] = useState<number>(3); // 1 = slow, 2 = medium, 3 = fast, 4 = very fast
   
+  // Cluster visualization states
+  const [showClusters, setShowClusters] = useState<boolean>(false);
+  const [clusterGrid, setClusterGrid] = useState<Int32Array | null>(null);
+  const [highlightedClusterId, setHighlightedClusterId] = useState<number>(-1);
+  const [isClusterSpanning, setIsClusterSpanning] = useState<boolean>(false);
+
   const [grid, setGrid] = useState<Uint8Array>(new Uint8Array(0));
   const [stats, setStats] = useState<SimulationStats | null>(null);
   const [stepCount, setStepCount] = useState<number>(0);
@@ -27,6 +33,11 @@ export function usePercolation() {
   const initialGridRef = useRef<Uint8Array | null>(null);
   const startTimeRef = useRef<number>(0);
   const runtimeOffsetRef = useRef<number>(0);
+
+  // History for replay scrubbing
+  const historyRef = useRef<Uint8Array[]>([]);
+  const statsHistoryRef = useRef<SimulationStats[]>([]);
+  const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
 
   // Map speed level to step delay in ms
   const getTickSpeed = (level: number): number => {
@@ -41,39 +52,70 @@ export function usePercolation() {
   const speed = getTickSpeed(speedLevel);
 
   // Generate grid based on parameters
-  const generateGrid = () => {
+  const generateGrid = useCallback(() => {
     const engine = new PercolationEngine(cols, rows, probability / 100, useDiagonal);
     engineRef.current = engine;
     initialGridRef.current = new Uint8Array(engine.grid);
 
-    setGrid(new Uint8Array(engine.grid));
-    setStats(engine.getStats());
+    const initialGrid = new Uint8Array(engine.grid);
+    const initialStats = engine.getStats();
+
+    setGrid(initialGrid);
+    setStats(initialStats);
     setStepCount(0);
     setRuntime(0);
     setSimState("idle");
     setPercolationResult(null);
-  };
+
+    // Initialize history
+    historyRef.current = [initialGrid];
+    statsHistoryRef.current = [initialStats];
+    setCurrentStepIndex(0);
+
+    // Calculate initial clusters
+    const clusters = engine.getClusters();
+    setClusterGrid(clusters.clusterIds);
+    setHighlightedClusterId(clusters.highlightedClusterId);
+    setIsClusterSpanning(clusters.isSpanning);
+  }, [cols, rows, probability, useDiagonal]);
+
+  const simStateRef = useRef(simState);
+  useEffect(() => {
+    simStateRef.current = simState;
+  }, [simState]);
 
   // Re-generate grid when parameters change, only if simulation is not currently running/paused
   useEffect(() => {
-    if (simState === "idle" || simState === "finished") {
+    if (simStateRef.current === "idle" || simStateRef.current === "finished") {
       generateGrid();
     }
-  }, [rows, cols, probability, useDiagonal]);
+  }, [generateGrid]);
 
   // Main simulation tick loop
   useEffect(() => {
     if (simState !== "running") return;
 
-    let timerId: any = null;
+    let timerId: ReturnType<typeof setTimeout> | null = null;
 
     const tick = () => {
       if (!engineRef.current) return;
 
       const result = engineRef.current.step();
-      setGrid(new Uint8Array(engineRef.current.grid));
-      setStats(engineRef.current.getStats());
-      setStepCount(engineRef.current.stepCount);
+      const currentStep = engineRef.current.stepCount;
+      const nextGrid = new Uint8Array(engineRef.current.grid);
+      const nextStats = engineRef.current.getStats();
+
+      // Truncate history and append the new step (handles resuming from earlier steps)
+      historyRef.current = historyRef.current.slice(0, currentStep);
+      historyRef.current.push(nextGrid);
+
+      statsHistoryRef.current = statsHistoryRef.current.slice(0, currentStep);
+      statsHistoryRef.current.push(nextStats);
+
+      setGrid(nextGrid);
+      setStats(nextStats);
+      setStepCount(currentStep);
+      setCurrentStepIndex(currentStep);
 
       // Track running time
       const elapsed = Date.now() - startTimeRef.current + runtimeOffsetRef.current;
@@ -91,25 +133,33 @@ export function usePercolation() {
     timerId = setTimeout(tick, speed);
 
     return () => {
-      clearTimeout(timerId);
+      if (timerId) clearTimeout(timerId);
     };
   }, [simState, speed]);
 
   const startFire = () => {
     if (!engineRef.current) return;
 
-    // Reset grid to unburnt state first if finished/paused
-    if (simState === "finished" || simState === "paused") {
+    // Reset grid to unburnt state first if finished/paused/scrubbed
+    if (simState === "finished" || simState === "paused" || currentStepIndex < stepCount) {
       resetGridToInitial();
     }
 
     engineRef.current.startFire();
-    setGrid(new Uint8Array(engineRef.current.grid));
-    setStats(engineRef.current.getStats());
+    const firedGrid = new Uint8Array(engineRef.current.grid);
+    const firedStats = engineRef.current.getStats();
+
+    setGrid(firedGrid);
+    setStats(firedStats);
     setStepCount(0);
     setRuntime(0);
     setSimState("running");
     setPercolationResult(null);
+
+    // Initialize history with step 0 of fire
+    historyRef.current = [firedGrid];
+    statsHistoryRef.current = [firedStats];
+    setCurrentStepIndex(0);
 
     startTimeRef.current = Date.now();
     runtimeOffsetRef.current = 0;
@@ -134,12 +184,58 @@ export function usePercolation() {
     engineRef.current.burningIndices = [];
     engineRef.current.stepCount = 0;
 
-    setGrid(new Uint8Array(engineRef.current.grid));
-    setStats(engineRef.current.getStats());
+    const initialGrid = new Uint8Array(engineRef.current.grid);
+    const initialStats = engineRef.current.getStats();
+
+    setGrid(initialGrid);
+    setStats(initialStats);
     setStepCount(0);
     setRuntime(0);
     setSimState("idle");
     setPercolationResult(null);
+
+    // Reset history to step 0
+    historyRef.current = [initialGrid];
+    statsHistoryRef.current = [initialStats];
+    setCurrentStepIndex(0);
+  };
+
+  // Jump to a specific step in history (scrubbing)
+  const jumpToStep = (index: number) => {
+    if (!engineRef.current || index < 0 || index >= historyRef.current.length) return;
+
+    // Auto-pause if running
+    if (simState === "running") {
+      handlePause();
+    }
+
+    const targetGrid = historyRef.current[index];
+    const targetStats = statsHistoryRef.current[index];
+
+    // Restore engine state
+    engineRef.current.restoreState(targetGrid, index);
+
+    // Update active UI states
+    setGrid(new Uint8Array(targetGrid));
+    setStats(targetStats);
+    setCurrentStepIndex(index);
+
+    // Adjust simulation state context
+    if (index === 0 && simState !== "idle") {
+      setSimState("idle");
+      setPercolationResult(null);
+    } else if (index < stepCount && (simState === "finished" || simState === "idle")) {
+      setSimState("paused");
+      setPercolationResult(null);
+    } else if (index === stepCount && simState === "paused") {
+      // Re-evaluate if finished if we scrubbed back to the end
+      const hasPerc = engineRef.current.hasPercolated();
+      const finished = engineRef.current.burningIndices.length === 0;
+      if (finished) {
+        setSimState("finished");
+        setPercolationResult(hasPerc ? "success" : "failure");
+      }
+    }
   };
 
   // Form handler clamps
@@ -188,5 +284,16 @@ export function usePercolation() {
     handleResume,
     resetGridToInitial,
     getSpeedLabel,
+    
+    // Cluster visualization
+    showClusters,
+    setShowClusters,
+    clusterGrid,
+    highlightedClusterId,
+    isClusterSpanning,
+
+    // Replay controls
+    currentStepIndex,
+    jumpToStep,
   };
 }
